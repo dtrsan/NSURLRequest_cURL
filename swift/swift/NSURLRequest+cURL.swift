@@ -17,46 +17,48 @@ extension NSURLRequest {
      *  not properly initalized.
      */
     func cURL() -> String? {
-
-        if let length = self.URL.absoluteString?.utf16Count {
+        if let url = self.URL {
+            let length = url.absoluteString.utf16.count
             if (length == 0) {
                 return nil
             }
-        } else {
-            return nil
+
+            let curlCommand = NSMutableString()
+            curlCommand.appendString("curl")
+
+            // append URL
+            curlCommand.appendFormat(" '%@'", url)
+
+            // append method if different from GET
+            if("GET" != self.HTTPMethod) {
+                curlCommand.appendFormat(" -X %@", self.HTTPMethod!)
+            }
+
+            // append headers
+            if let allHTTPHeaderFields = self.allHTTPHeaderFields {
+                let allHeadersKeys = Array(allHTTPHeaderFields.keys)
+                let sortedHeadersKeys  = allHeadersKeys.sort()
+                for key in sortedHeadersKeys {
+                    curlCommand.appendFormat(" -H '%@: %@'",
+                                             key, self.valueForHTTPHeaderField(key)!)
+                }
+            }
+
+            // append HTTP body
+            if let httpBody = self.HTTPBody where httpBody.length > 0 {
+                if let body = NSString(data: httpBody,
+                                       encoding: NSUTF8StringEncoding) {
+                    let escapedHttpBody =
+                        NSURLRequest.escapeAllSingleQuotes(String(body))
+                    curlCommand.appendFormat(" --data '%@'", escapedHttpBody)
+                }
+
+            }
+
+            return String(curlCommand)
         }
 
-        let curlCommand = NSMutableString()
-        curlCommand.appendString("curl")
-
-        // append URL
-        curlCommand.appendFormat(" '%@'", self.URL.absoluteString!)
-
-        // append method if different from GET
-        if("GET" != self.HTTPMethod) {
-            curlCommand.appendFormat(" -X %@", self.HTTPMethod!)
-        }
-
-        // append headers
-        let allHeadersFields = self.allHTTPHeaderFields as? [String: String]
-        let allHeadersKeys = allHTTPHeaderFields?.keys.array as [String]
-        let sortedHeadersKeys  = allHeadersKeys.sorted { $0 < $1 }
-        for key in sortedHeadersKeys {
-            curlCommand.appendFormat(" -H '%@: %@'",
-                                      key, self.valueForHTTPHeaderField(key)!)
-        }
-
-        // append HTTP body
-        let httpBody = self.HTTPBody
-        if httpBody?.length > 0 {
-            let httpBody = NSString(data: self.HTTPBody!,
-                                    encoding: NSUTF8StringEncoding)
-            let escapedHttpBody =
-              NSURLRequest.escapeAllSingleQuotes(httpBody!)
-            curlCommand.appendFormat(" --data '%@'", escapedHttpBody)
-        }
-
-        return String(curlCommand)
+        return nil
     }
 
     /**
@@ -68,6 +70,6 @@ extension NSURLRequest {
      */
     class func escapeAllSingleQuotes(value: String) -> String {
         return
-          value.stringByReplacingOccurrencesOfString("'", withString: "'\\''")
+            value.stringByReplacingOccurrencesOfString("'", withString: "'\\''")
     }
 }
